@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -86,6 +89,52 @@ func (s *SchemaMap) serveSchema(w http.ResponseWriter, r *http.Request, id strin
 }
 
 func (s *SchemaMap) uploadSchema(w http.ResponseWriter, r *http.Request, id string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.Schema[id]; ok {
+		http.Error(w, "", http.StatusMethodNotAllowed)
+		return
+	}
+	var b bytes.Buffer
+	io.Copy(&b, r.Body)
+	if !json.Valid(b.Bytes()) {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, `{
+	"action": "uploadSchema",
+	"id": %q,
+	"status": "error",
+	"message": "Invalid JSON"
+}`, id)
+		return
+	}
+	url := "schema://" + path.Join("/", s.Dir, id)
+	if err := s.Compiler.AddResource(url, &b); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, `{
+	"action": "uploadSchema",
+	"id": %q,
+	"status": "error",
+	"message": %q
+}`, id, err)
+		return
+	}
+	cs, err := s.Compiler.Compile(url)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, `{
+	"action": "uploadSchema",
+	"id": %q,
+	"status": "error",
+	"message": %q
+}`, id, err)
+		return
+	}
+	s.Schema[id] = cs
+	fmt.Fprintf(w, `{
+	"action": "uploadSchema",
+	"id": %q,
+	"status": "success"
+}`, id)
 }
 
 func (s *SchemaMap) validateJSON(w http.ResponseWriter, r *http.Request, id string) {
