@@ -155,7 +155,7 @@ func (s *SchemaMap) validateJSON(w http.ResponseWriter, r *http.Request, id stri
 	"message": "Invalid JSON"
 }`, id)
 		}
-		// remove nulls
+		removeNulls(v)
 		if err := schema.Validate(v); err != nil {
 			fmt.Fprintf(w, `{
 	"action": "validateDocument",
@@ -172,5 +172,17 @@ func (s *SchemaMap) validateJSON(w http.ResponseWriter, r *http.Request, id stri
 		}
 	} else {
 		http.Error(w, "", http.StatusNotFound)
+	}
+}
+
+func removeNulls(v interface{}) {
+	if obj, ok := v.(map[string]interface{}); ok {
+		for key, value := range obj {
+			if value == nil {
+				delete(obj, key)
+			} else {
+				removeNulls(value)
+			}
+		}
 	}
 }
