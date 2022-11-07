@@ -29,7 +29,7 @@ func validID(id string) bool {
 }
 
 func respond(w http.ResponseWriter, code int, format string, a ...interface{}) {
-	w.Header().Add("Content-Type", "application/json")
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	fmt.Fprintf(w, format, a...)
 }
@@ -149,6 +149,7 @@ func (s *Schema) handleValidateOptions(w http.ResponseWriter, r *http.Request, i
 
 func (s *Schema) serveSchema(w http.ResponseWriter, r *http.Request, id string) {
 	if s.hasID(id) {
+		w.Header().Set("Content-Type", "application/json")
 		http.ServeFile(w, r, filepath.Join(s.Dir, id))
 	} else {
 		respond(w, http.StatusNotFound, `{"action": "uploadSchema", "id": %q, "status": "error", "message": "Unknown ID"}`, id)
