@@ -34,7 +34,7 @@ func respond(w http.ResponseWriter, code int, format string, a ...interface{}) {
 	fmt.Fprintf(w, format, a...)
 }
 
-type SchemaMap struct {
+type Schema struct {
 	Compiler *jsonschema.Compiler
 	Dir      string
 
@@ -42,7 +42,7 @@ type SchemaMap struct {
 	Schema map[string]*jsonschema.Schema
 }
 
-func NewSchema(dir string) (*SchemaMap, error) {
+func NewSchema(dir string) (*Schema, error) {
 	if err := os.Mkdir(dir, 0o755); err != nil && !os.IsExist(err) {
 		return nil, fmt.Errorf("error creating schema directory: %w", err)
 	}
@@ -71,21 +71,21 @@ func NewSchema(dir string) (*SchemaMap, error) {
 		f.Close()
 		m[name] = s
 	}
-	return &SchemaMap{
+	return &Schema{
 		Compiler: c,
 		Dir:      dir,
 		Schema:   m,
 	}, nil
 }
 
-func (s *SchemaMap) hasID(id string) bool {
+func (s *Schema) hasID(id string) bool {
 	s.mu.RLock()
 	_, ok := s.Schema[id]
 	s.mu.RUnlock()
 	return ok
 }
 
-func (s *SchemaMap) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (s *Schema) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if strings.HasPrefix(r.URL.Path, "/schema/") {
 		s.handleSchema(w, r)
 	} else if strings.HasPrefix(r.URL.Path, "/validate/") {
@@ -95,7 +95,7 @@ func (s *SchemaMap) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *SchemaMap) handleSchema(w http.ResponseWriter, r *http.Request) {
+func (s *Schema) handleSchema(w http.ResponseWriter, r *http.Request) {
 	id := strings.TrimPrefix(r.URL.Path, "/schema/")
 	if !validID(id) {
 		respond(w, http.StatusBadRequest, `{"action": "uploadSchema", "id": %q, "status": "error", "message": "Invalid ID"}`, id)
@@ -113,7 +113,7 @@ func (s *SchemaMap) handleSchema(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *SchemaMap) handleValidate(w http.ResponseWriter, r *http.Request) {
+func (s *Schema) handleValidate(w http.ResponseWriter, r *http.Request) {
 	id := strings.TrimPrefix(r.URL.Path, "/validate/")
 	if !validID(id) {
 		respond(w, http.StatusBadRequest, `{"action": "validateDocument", "id": %q, "status": "error", "message": "Invalid ID"}`, id)
@@ -129,7 +129,7 @@ func (s *SchemaMap) handleValidate(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *SchemaMap) handleSchemaOptions(w http.ResponseWriter, r *http.Request, id string) {
+func (s *Schema) handleSchemaOptions(w http.ResponseWriter, r *http.Request, id string) {
 	if s.hasID(id) {
 		w.Header().Add("Allow", optionsGetHead)
 	} else {
@@ -138,7 +138,7 @@ func (s *SchemaMap) handleSchemaOptions(w http.ResponseWriter, r *http.Request, 
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (s *SchemaMap) handleValidateOptions(w http.ResponseWriter, r *http.Request, id string) {
+func (s *Schema) handleValidateOptions(w http.ResponseWriter, r *http.Request, id string) {
 	if s.hasID(id) {
 		w.Header().Add("Allow", optionsPost)
 		w.WriteHeader(http.StatusNoContent)
@@ -147,7 +147,7 @@ func (s *SchemaMap) handleValidateOptions(w http.ResponseWriter, r *http.Request
 	}
 }
 
-func (s *SchemaMap) serveSchema(w http.ResponseWriter, r *http.Request, id string) {
+func (s *Schema) serveSchema(w http.ResponseWriter, r *http.Request, id string) {
 	if s.hasID(id) {
 		http.ServeFile(w, r, filepath.Join(s.Dir, id))
 	} else {
@@ -155,7 +155,7 @@ func (s *SchemaMap) serveSchema(w http.ResponseWriter, r *http.Request, id strin
 	}
 }
 
-func (s *SchemaMap) uploadSchema(w http.ResponseWriter, r *http.Request, id string) {
+func (s *Schema) uploadSchema(w http.ResponseWriter, r *http.Request, id string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if _, ok := s.Schema[id]; ok {
@@ -188,7 +188,7 @@ func (s *SchemaMap) uploadSchema(w http.ResponseWriter, r *http.Request, id stri
 	respond(w, http.StatusInternalServerError, `{"action": "uploadSchema", "id": %q, "status": "error", "message": "Unexpected Error"}`, id)
 }
 
-func (s *SchemaMap) validateJSON(w http.ResponseWriter, r *http.Request, id string) {
+func (s *Schema) validateJSON(w http.ResponseWriter, r *http.Request, id string) {
 	s.mu.RLock()
 	schema, ok := s.Schema[id]
 	s.mu.RUnlock()
