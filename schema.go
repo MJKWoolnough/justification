@@ -59,32 +59,22 @@ func NewSchema(dir string) (*SchemaMap, error) {
 }
 
 func (s *SchemaMap) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if strings.HasPrefix(r.URL.Path, "/schema/") || r.URL.Path == "/schema" {
+	if strings.HasPrefix(r.URL.Path, "/schema/") {
 		s.handleSchema(w, r)
-	} else if strings.HasPrefix(r.URL.Path, "/validate/") || r.URL.Path == "/validate" {
+	} else if strings.HasPrefix(r.URL.Path, "/validate/") {
 		s.handleValidate(w, r)
-	} else if r.URL.Path == "/" {
-		// list endpoints
 	} else {
 		http.Error(w, "", http.StatusNotFound)
 	}
 }
 
 func (s *SchemaMap) handleSchema(w http.ResponseWriter, r *http.Request) {
-	id := strings.TrimPrefix(r.URL.Path, "/schema")
+	id := strings.TrimPrefix(r.URL.Path, "/schema/")
 	switch r.Method {
 	case http.MethodGet:
-		if id == "" || id == "/" {
-			// list schema
-		} else {
-			s.serveSchema(w, r, id[1:])
-		}
+		s.serveSchema(w, r, id)
 	case http.MethodPost:
-		if id == "" || id == "/" {
-			http.Error(w, "", http.StatusMethodNotAllowed)
-		} else {
-			s.uploadSchema(w, r, id[1:])
-		}
+		s.uploadSchema(w, r, id)
 	case http.MethodOptions:
 	default:
 		http.Error(w, "", http.StatusMethodNotAllowed)
@@ -92,20 +82,10 @@ func (s *SchemaMap) handleSchema(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *SchemaMap) handleValidate(w http.ResponseWriter, r *http.Request) {
-	id := strings.TrimPrefix(r.URL.Path, "/schema")
+	id := strings.TrimPrefix(r.URL.Path, "/schema/")
 	switch r.Method {
-	case http.MethodGet:
-		if id == "" || id == "/" {
-			// list schema
-		} else {
-			http.Error(w, "", http.StatusMethodNotAllowed)
-		}
 	case http.MethodPost:
-		if id == "" || id == "/" {
-			http.Error(w, "", http.StatusMethodNotAllowed)
-		} else {
-			s.validateJSON(w, r, id[1:])
-		}
+		s.validateJSON(w, r, id)
 	case http.MethodOptions:
 	default:
 		http.Error(w, "", http.StatusMethodNotAllowed)
