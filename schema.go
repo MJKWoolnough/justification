@@ -19,6 +19,15 @@ const (
 	optionsGetHead = "OPTIONS, GET, HEAD"
 )
 
+func validID(id string) bool {
+	for _, c := range id {
+		if (c < '0' || c > '9') && (c < 'A' || c > 'Z') && (c < 'a' || c > 'z') && c != '_' && c != '-' {
+			return false
+		}
+	}
+	return true
+}
+
 type SchemaMap struct {
 	Compiler *jsonschema.Compiler
 	Dir      string
@@ -82,6 +91,10 @@ func (s *SchemaMap) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (s *SchemaMap) handleSchema(w http.ResponseWriter, r *http.Request) {
 	id := strings.TrimPrefix(r.URL.Path, "/schema/")
+	if !validID(id) {
+		http.Error(w, "", http.StatusBadRequest)
+		return
+	}
 	switch r.Method {
 	case http.MethodGet:
 		s.serveSchema(w, r, id)
@@ -95,7 +108,11 @@ func (s *SchemaMap) handleSchema(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *SchemaMap) handleValidate(w http.ResponseWriter, r *http.Request) {
-	id := strings.TrimPrefix(r.URL.Path, "/schema/")
+	id := strings.TrimPrefix(r.URL.Path, "/validate/")
+	if !validID(id) {
+		http.Error(w, "", http.StatusBadRequest)
+		return
+	}
 	switch r.Method {
 	case http.MethodPost:
 		s.validateJSON(w, r, id)
