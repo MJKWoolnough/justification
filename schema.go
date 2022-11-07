@@ -101,7 +101,13 @@ func (s *SchemaMap) uploadSchema(w http.ResponseWriter, r *http.Request, id stri
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if _, ok := s.Schema[id]; ok {
-		http.Error(w, "", http.StatusMethodNotAllowed)
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		fmt.Fprintf(w, `{
+	"action": "uploadSchema",
+	"id": %q,
+	"status": "error",
+	"message": "ID Exists"
+}`, id)
 		return
 	}
 	var b bytes.Buffer
