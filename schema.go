@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -34,7 +35,7 @@ func (s *SchemaMap) handleSchema(w http.ResponseWriter, r *http.Request) {
 		if id == "" || id == "/" {
 			// list schema
 		} else {
-			s.serveSchema(w, id[1:])
+			s.serveSchema(w, r, id[1:])
 		}
 	case http.MethodPost:
 		if id == "" || id == "/" {
@@ -69,7 +70,16 @@ func (s *SchemaMap) handleValidate(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *SchemaMap) serveSchema(w http.ResponseWriter, id string) {
+func (s *SchemaMap) serveSchema(w http.ResponseWriter, r *http.Request, id string) {
+	s.mu.RLock()
+	_, ok := s.Schema[id]
+	s.mu.RUnlock()
+	w.Header().Add("Content-Type", "application/json")
+	if ok {
+		http.ServeFile(w, r, filepath.Join(s.Dir, id))
+	} else {
+		http.Error(w, "", http.StatusNotFound)
+	}
 }
 
 func (s *SchemaMap) uploadSchema(w http.ResponseWriter, r *http.Request, id string) {
