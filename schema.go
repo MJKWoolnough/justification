@@ -80,19 +80,30 @@ func (s *SchemaMap) hasID(id string) bool {
 }
 
 func (s *SchemaMap) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	w.Header().Add("Content-Type", "application/json")
 	if strings.HasPrefix(r.URL.Path, "/schema/") {
 		s.handleSchema(w, r)
 	} else if strings.HasPrefix(r.URL.Path, "/validate/") {
 		s.handleValidate(w, r)
 	} else {
-		http.Error(w, "", http.StatusNotFound)
+		w.WriteHeader(http.StatusNotFound)
+		io.WriteString(w, `{
+	"status": "error",
+	"message": Unknown Endpoint"
+}`)
 	}
 }
 
 func (s *SchemaMap) handleSchema(w http.ResponseWriter, r *http.Request) {
 	id := strings.TrimPrefix(r.URL.Path, "/schema/")
 	if !validID(id) {
-		http.Error(w, "", http.StatusBadRequest)
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, `{
+	"action": "uploadSchema",
+	"id": %q,
+	"status": "error",
+	"message": "Invalid ID"
+}`, id)
 		return
 	}
 	switch r.Method {
@@ -103,14 +114,26 @@ func (s *SchemaMap) handleSchema(w http.ResponseWriter, r *http.Request) {
 	case http.MethodOptions:
 		s.handleSchemaOptions(w, r, id)
 	default:
-		http.Error(w, "", http.StatusMethodNotAllowed)
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		fmt.Fprintf(w, `{
+	"action": "uploadSchema",
+	"id": %q,
+	"status": "error",
+	"message": "Method Not Allowed"
+}`, id)
 	}
 }
 
 func (s *SchemaMap) handleValidate(w http.ResponseWriter, r *http.Request) {
 	id := strings.TrimPrefix(r.URL.Path, "/validate/")
 	if !validID(id) {
-		http.Error(w, "", http.StatusBadRequest)
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, `{
+	"action": "validateDocument",
+	"id": %q,
+	"status": "error",
+	"message": "Invalid ID"
+}`, id)
 		return
 	}
 	switch r.Method {
@@ -119,7 +142,13 @@ func (s *SchemaMap) handleValidate(w http.ResponseWriter, r *http.Request) {
 	case http.MethodOptions:
 		s.handleValidateOptions(w, r, id)
 	default:
-		http.Error(w, "", http.StatusMethodNotAllowed)
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		fmt.Fprintf(w, `{
+	"action": "validateDocument",
+	"id": %q,
+	"status": "error",
+	"message": "Method Not Allowed"
+}`, id)
 	}
 }
 
@@ -137,16 +166,27 @@ func (s *SchemaMap) handleValidateOptions(w http.ResponseWriter, r *http.Request
 		w.Header().Add("Allow", optionsPost)
 		w.WriteHeader(http.StatusNoContent)
 	} else {
-		http.Error(w, "", http.StatusMethodNotAllowed)
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		fmt.Fprintf(w, `{
+	"action": "validateDocument",
+	"id": %q,
+	"status": "error",
+	"message": "Method Not Allowed"
+}`, id)
 	}
 }
 
 func (s *SchemaMap) serveSchema(w http.ResponseWriter, r *http.Request, id string) {
-	w.Header().Add("Content-Type", "application/json")
 	if s.hasID(id) {
 		http.ServeFile(w, r, filepath.Join(s.Dir, id))
 	} else {
-		http.Error(w, "", http.StatusNotFound)
+		w.WriteHeader(http.StatusNotFound)
+		fmt.Fprintf(w, `{
+	"action": "uploadSchema",
+	"id": %q,
+	"status": "error",
+	"message": "Unknown ID"
+}`, id)
 	}
 }
 
@@ -216,7 +256,6 @@ func (s *SchemaMap) validateJSON(w http.ResponseWriter, r *http.Request, id stri
 	schema, ok := s.Schema[id]
 	s.mu.RUnlock()
 	if ok {
-		w.Header().Add("Content-Type", "application/json")
 		dec := json.NewDecoder(r.Body)
 		dec.UseNumber()
 		var v interface{}
@@ -245,7 +284,13 @@ func (s *SchemaMap) validateJSON(w http.ResponseWriter, r *http.Request, id stri
 }`, id)
 		}
 	} else {
-		http.Error(w, "", http.StatusNotFound)
+		w.WriteHeader(http.StatusNotFound)
+		fmt.Fprintf(w, `{
+	"action": "validateDocument",
+	"id": %q,
+	"status": "error",
+	"message": "Unknown ID"
+}`, id)
 	}
 }
 
