@@ -10,8 +10,6 @@ import (
 	"os/signal"
 	"path"
 	"path/filepath"
-
-	jsonschema "github.com/santhosh-tekuri/jsonschema/v5"
 )
 
 func main() {
@@ -21,16 +19,11 @@ func main() {
 }
 
 func run() error {
-	schema := SchemaMap{
-		Compiler: jsonschema.NewCompiler(),
-		Schema:   make(map[string]*jsonschema.Schema),
-	}
-
 	port := flag.Uint("p", 8080, "port for server to listen on")
-	host := flag.String("h", "localhost", "server host name.")
-	_ = host
-	flag.StringVar(&schema.Dir, "d", "./schemas", "directory to store uplgoaded JSON schemas")
+	dir := flag.String("d", "./schemas", "directory to store uplgoaded JSON schemas")
 	flag.Parse()
+
+	schema := NewSchema(*dir)
 
 	if err := os.Mkdir(schema.Dir, 0o755); err != nil && !os.IsExist(err) {
 		return fmt.Errorf("error creating schema directory: %w", err)
@@ -52,7 +45,7 @@ func run() error {
 		if err := schema.Compiler.AddResource(url, f); err != nil {
 			return fmt.Errorf("error adding scheme as resource: %w", err)
 		}
-		s, err := c.Compile(url)
+		s, err := schema.Compiler.Compile(url)
 		if err != nil {
 			return fmt.Errorf("error compiling schema: %w", err)
 		}
@@ -61,7 +54,7 @@ func run() error {
 	}
 
 	server := &http.Server{
-		Handler: &schema,
+		Handler: schema,
 	}
 
 	l, err := net.ListenTCP("tcp", &net.TCPAddr{Port: int(*port)})

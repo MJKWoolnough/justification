@@ -22,6 +22,14 @@ type SchemaMap struct {
 	Schema map[string]*jsonschema.Schema
 }
 
+func NewSchema(dir string) *SchemaMap {
+	return &SchemaMap{
+		Compiler: jsonschema.NewCompiler(),
+		Dir:      dir,
+		Schema:   make(map[string]*jsonschema.Schema),
+	}
+}
+
 func (s *SchemaMap) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if strings.HasPrefix(r.URL.Path, "/schema/") || r.URL.Path == "/schema" {
 		s.handleSchema(w, r)
