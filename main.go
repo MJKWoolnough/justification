@@ -49,7 +49,9 @@ func run() error {
 			return fmt.Errorf("error reading schema file (%s): %w", schemapath, err)
 		}
 		url := "schema://" + path.Join("/", schema.Dir, name)
-		schema.Compiler.AddResource(url, f)
+		if err := schema.Compiler.AddResource(url, f); err != nil {
+			return fmt.Errorf("error adding scheme as resource: %w", err)
+		}
 		s, err := c.Compile(url)
 		if err != nil {
 			return fmt.Errorf("error compiling schema: %w", err)
