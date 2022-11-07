@@ -28,6 +28,12 @@ func validID(id string) bool {
 	return true
 }
 
+func respond(w http.ResponseWriter, code int, format string, a ...interface{}) {
+	w.Header().Add("Content-Type", "application/json")
+	w.WriteHeader(code)
+	fmt.Fprintf(w, format, a...)
+}
+
 type SchemaMap struct {
 	Compiler *jsonschema.Compiler
 	Dir      string
@@ -80,30 +86,19 @@ func (s *SchemaMap) hasID(id string) bool {
 }
 
 func (s *SchemaMap) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	w.Header().Add("Content-Type", "application/json")
 	if strings.HasPrefix(r.URL.Path, "/schema/") {
 		s.handleSchema(w, r)
 	} else if strings.HasPrefix(r.URL.Path, "/validate/") {
 		s.handleValidate(w, r)
 	} else {
-		w.WriteHeader(http.StatusNotFound)
-		io.WriteString(w, `{
-	"status": "error",
-	"message": Unknown Endpoint"
-}`)
+		respond(w, http.StatusNotFound, `{"status": "error", "message": Unknown Endpoint" }`)
 	}
 }
 
 func (s *SchemaMap) handleSchema(w http.ResponseWriter, r *http.Request) {
 	id := strings.TrimPrefix(r.URL.Path, "/schema/")
 	if !validID(id) {
-		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprintf(w, `{
-	"action": "uploadSchema",
-	"id": %q,
-	"status": "error",
-	"message": "Invalid ID"
-}`, id)
+		respond(w, http.StatusBadRequest, `{"action": "uploadSchema", "id": %q, "status": "error", "message": "Invalid ID"}`, id)
 		return
 	}
 	switch r.Method {
@@ -114,26 +109,14 @@ func (s *SchemaMap) handleSchema(w http.ResponseWriter, r *http.Request) {
 	case http.MethodOptions:
 		s.handleSchemaOptions(w, r, id)
 	default:
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		fmt.Fprintf(w, `{
-	"action": "uploadSchema",
-	"id": %q,
-	"status": "error",
-	"message": "Method Not Allowed"
-}`, id)
+		respond(w, http.StatusMethodNotAllowed, `{"action": "uploadSchema", "id": %q, "status": "error", "message": "Method Not Allowed"}`, id)
 	}
 }
 
 func (s *SchemaMap) handleValidate(w http.ResponseWriter, r *http.Request) {
 	id := strings.TrimPrefix(r.URL.Path, "/validate/")
 	if !validID(id) {
-		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprintf(w, `{
-	"action": "validateDocument",
-	"id": %q,
-	"status": "error",
-	"message": "Invalid ID"
-}`, id)
+		respond(w, http.StatusBadRequest, `{"action": "validateDocument", "id": %q, "status": "error", "message": "Invalid ID"}`, id)
 		return
 	}
 	switch r.Method {
@@ -142,13 +125,7 @@ func (s *SchemaMap) handleValidate(w http.ResponseWriter, r *http.Request) {
 	case http.MethodOptions:
 		s.handleValidateOptions(w, r, id)
 	default:
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		fmt.Fprintf(w, `{
-	"action": "validateDocument",
-	"id": %q,
-	"status": "error",
-	"message": "Method Not Allowed"
-}`, id)
+		respond(w, http.StatusMethodNotAllowed, `{"action": "validateDocument", "id": %q, "status": "error", "message": "Method Not Allowed"}`, id)
 	}
 }
 
@@ -166,13 +143,7 @@ func (s *SchemaMap) handleValidateOptions(w http.ResponseWriter, r *http.Request
 		w.Header().Add("Allow", optionsPost)
 		w.WriteHeader(http.StatusNoContent)
 	} else {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		fmt.Fprintf(w, `{
-	"action": "validateDocument",
-	"id": %q,
-	"status": "error",
-	"message": "Method Not Allowed"
-}`, id)
+		respond(w, http.StatusMethodNotAllowed, `{"action": "validateDocument", "id": %q, "status": "error", "message": "Method Not Allowed"}`, id)
 	}
 }
 
@@ -180,13 +151,7 @@ func (s *SchemaMap) serveSchema(w http.ResponseWriter, r *http.Request, id strin
 	if s.hasID(id) {
 		http.ServeFile(w, r, filepath.Join(s.Dir, id))
 	} else {
-		w.WriteHeader(http.StatusNotFound)
-		fmt.Fprintf(w, `{
-	"action": "uploadSchema",
-	"id": %q,
-	"status": "error",
-	"message": "Unknown ID"
-}`, id)
+		respond(w, http.StatusNotFound, `{"action": "uploadSchema", "id": %q, "status": "error", "message": "Unknown ID"}`, id)
 	}
 }
 
@@ -194,13 +159,7 @@ func (s *SchemaMap) uploadSchema(w http.ResponseWriter, r *http.Request, id stri
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if _, ok := s.Schema[id]; ok {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		fmt.Fprintf(w, `{
-	"action": "uploadSchema",
-	"id": %q,
-	"status": "error",
-	"message": "ID Exists"
-}`, id)
+		respond(w, http.StatusMethodNotAllowed, `{"action": "uploadSchema", "id": %q, "status": "error", "message": "ID Exists"}`, id)
 		return
 	}
 	var b bytes.Buffer
@@ -208,24 +167,12 @@ func (s *SchemaMap) uploadSchema(w http.ResponseWriter, r *http.Request, id stri
 	data := b.Bytes()
 	url := "schema:///" + id
 	if err := s.Compiler.AddResource(url, &b); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprintf(w, `{
-	"action": "uploadSchema",
-	"id": %q,
-	"status": "error",
-	"message": "Invalid JSON"
-}`, id)
+		respond(w, http.StatusBadRequest, `{"action": "uploadSchema", "id": %q, "status": "error", "message": "Invalid JSON"}`, id)
 		return
 	}
 	cs, err := s.Compiler.Compile(url)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprintf(w, `{
-	"action": "uploadSchema",
-	"id": %q,
-	"status": "error",
-	"message": %q
-}`, id, err)
+		respond(w, http.StatusBadRequest, `{"action": "uploadSchema", "id": %q, "status": "error", "message": %q}`, id, err)
 		return
 	}
 	f, err := os.Create(filepath.Join(s.Dir, id))
@@ -233,22 +180,12 @@ func (s *SchemaMap) uploadSchema(w http.ResponseWriter, r *http.Request, id stri
 		if _, err = f.Write(data); err == nil {
 			if err = f.Close(); err == nil {
 				s.Schema[id] = cs
-				fmt.Fprintf(w, `{
-	"action": "uploadSchema",
-	"id": %q,
-	"status": "success"
-}`, id)
+				respond(w, http.StatusCreated, `{"action": "uploadSchema", "id": %q, "status": "success"}`, id)
 				return
 			}
 		}
 	}
-	w.WriteHeader(http.StatusInternalServerError)
-	fmt.Fprintf(w, `{
-	"action": "uploadSchema",
-	"id": %q,
-	"status": "error",
-	"message": "Unexpected Error"
-}`, id)
+	respond(w, http.StatusInternalServerError, `{"action": "uploadSchema", "id": %q, "status": "error", "message": "Unexpected Error"}`, id)
 }
 
 func (s *SchemaMap) validateJSON(w http.ResponseWriter, r *http.Request, id string) {
@@ -260,37 +197,16 @@ func (s *SchemaMap) validateJSON(w http.ResponseWriter, r *http.Request, id stri
 		dec.UseNumber()
 		var v interface{}
 		if err := dec.Decode(&v); err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			fmt.Fprintf(w, `{
-	"action": "validateDocument",
-	"id": %q,
-	"status": "error",
-	"message": "Invalid JSON"
-}`, id)
+			respond(w, http.StatusBadRequest, `{"action": "validateDocument", "id": %q, "status": "error", "message": "Invalid JSON"}`, id)
 		}
 		removeNulls(v)
 		if err := schema.Validate(v); err != nil {
-			fmt.Fprintf(w, `{
-	"action": "validateDocument",
-	"id": %q,
-	"status": "error",
-	"message": %q
-}`, id, err)
+			respond(w, http.StatusBadRequest, `{"action": "validateDocument", "id": %q, "status": "error", "message": %q}`, id, err)
 		} else {
-			fmt.Fprintf(w, `{
-	"action": "validateDocument",
-	"id": %q,
-	"status": "success"
-}`, id)
+			respond(w, http.StatusOK, `{"action": "validateDocument", "id": %q, "status": "success"}`, id)
 		}
 	} else {
-		w.WriteHeader(http.StatusNotFound)
-		fmt.Fprintf(w, `{
-	"action": "validateDocument",
-	"id": %q,
-	"status": "error",
-	"message": "Unknown ID"
-}`, id)
+		respond(w, http.StatusNotFound, `{"action": "validateDocument", "id": %q, "status": "error", "message": "Unknown ID"}`, id)
 	}
 }
 
