@@ -8,8 +8,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"path"
-	"path/filepath"
 )
 
 func main() {
@@ -23,34 +21,9 @@ func run() error {
 	dir := flag.String("d", "./schemas", "directory to store uplgoaded JSON schemas")
 	flag.Parse()
 
-	schema := NewSchema(*dir)
-
-	if err := os.Mkdir(schema.Dir, 0o755); err != nil && !os.IsExist(err) {
-		return fmt.Errorf("error creating schema directory: %w", err)
-	}
-
-	schemaDir, err := os.ReadDir(schema.Dir)
+	schema, err := NewSchema(*dir)
 	if err != nil {
-		return fmt.Errorf("error reading schema directory: %w", err)
-	}
-
-	for _, file := range schemaDir {
-		name := file.Name()
-		schemapath := filepath.Join(schema.Dir, name)
-		f, err := os.Open(schemapath)
-		if err != nil {
-			return fmt.Errorf("error reading schema file (%s): %w", schemapath, err)
-		}
-		url := "schema://" + path.Join("/", schema.Dir, name)
-		if err := schema.Compiler.AddResource(url, f); err != nil {
-			return fmt.Errorf("error adding scheme as resource: %w", err)
-		}
-		s, err := schema.Compiler.Compile(url)
-		if err != nil {
-			return fmt.Errorf("error compiling schema: %w", err)
-		}
-		f.Close()
-		schema.Schema[name] = s
+		return err
 	}
 
 	server := &http.Server{

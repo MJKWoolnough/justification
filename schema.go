@@ -23,12 +23,40 @@ type SchemaMap struct {
 	Schema map[string]*jsonschema.Schema
 }
 
-func NewSchema(dir string) *SchemaMap {
-	return &SchemaMap{
-		Compiler: jsonschema.NewCompiler(),
-		Dir:      dir,
-		Schema:   make(map[string]*jsonschema.Schema),
+func NewSchema(dir string) (*SchemaMap, error) {
+	if err := os.Mkdir(dir, 0o755); err != nil && !os.IsExist(err) {
+		return nil, fmt.Errorf("error creating schema directory: %w", err)
 	}
+
+	schemaDir, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, fmt.Errorf("error reading schema directory: %w", err)
+	}
+	c := jsonschema.NewCompiler()
+	m := make(map[string]*jsonschema.Schema)
+	for _, file := range schemaDir {
+		name := file.Name()
+		schemapath := filepath.Join(dir, name)
+		f, err := os.Open(schemapath)
+		if err != nil {
+			return nil, fmt.Errorf("error reading schema file (%s): %w", schemapath, err)
+		}
+		url := "schema://" + path.Join("/", dir, name)
+		if err := c.AddResource(url, f); err != nil {
+			return nil, fmt.Errorf("error adding scheme as resource: %w", err)
+		}
+		s, err := c.Compile(url)
+		if err != nil {
+			return nil, fmt.Errorf("error compiling schema: %w", err)
+		}
+		f.Close()
+		m[name] = s
+	}
+	return &SchemaMap{
+		Compiler: c,
+		Dir:      dir,
+		Schema:   m,
+	}, nil
 }
 
 func (s *SchemaMap) ServeHTTP(w http.ResponseWriter, r *http.Request) {
