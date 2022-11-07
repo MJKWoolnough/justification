@@ -113,16 +113,6 @@ func (s *SchemaMap) uploadSchema(w http.ResponseWriter, r *http.Request, id stri
 	var b bytes.Buffer
 	io.Copy(&b, r.Body)
 	data := b.Bytes()
-	if !json.Valid(data) {
-		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprintf(w, `{
-	"action": "uploadSchema",
-	"id": %q,
-	"status": "error",
-	"message": "Invalid JSON"
-}`, id)
-		return
-	}
 	url := "schema://" + path.Join("/", s.Dir, id)
 	if err := s.Compiler.AddResource(url, &b); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -130,8 +120,8 @@ func (s *SchemaMap) uploadSchema(w http.ResponseWriter, r *http.Request, id stri
 	"action": "uploadSchema",
 	"id": %q,
 	"status": "error",
-	"message": %q
-}`, id, err)
+	"message": "Invalid JSON"
+}`, id)
 		return
 	}
 	cs, err := s.Compiler.Compile(url)
