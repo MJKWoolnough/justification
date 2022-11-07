@@ -63,6 +63,13 @@ func NewSchema(dir string) (*SchemaMap, error) {
 	}, nil
 }
 
+func (s *SchemaMap) hasID(id string) bool {
+	s.mu.RLock()
+	_, ok := s.Schema[id]
+	s.mu.RUnlock()
+	return ok
+}
+
 func (s *SchemaMap) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if strings.HasPrefix(r.URL.Path, "/schema/") {
 		s.handleSchema(w, r)
@@ -100,10 +107,7 @@ func (s *SchemaMap) handleValidate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *SchemaMap) handleSchemaOptions(w http.ResponseWriter, r *http.Request, id string) {
-	s.mu.RLock()
-	_, ok := s.Schema[id]
-	s.mu.RUnlock()
-	if ok {
+	if s.hasID(id) {
 		w.Header().Add("Allow", optionsGetHead)
 	} else {
 		w.Header().Add("Allow", optionsPost)
@@ -112,10 +116,7 @@ func (s *SchemaMap) handleSchemaOptions(w http.ResponseWriter, r *http.Request, 
 }
 
 func (s *SchemaMap) handleValidateOptions(w http.ResponseWriter, r *http.Request, id string) {
-	s.mu.RLock()
-	_, ok := s.Schema[id]
-	s.mu.RUnlock()
-	if ok {
+	if s.hasID(id) {
 		w.Header().Add("Allow", optionsPost)
 		w.WriteHeader(http.StatusNoContent)
 	} else {
@@ -124,11 +125,8 @@ func (s *SchemaMap) handleValidateOptions(w http.ResponseWriter, r *http.Request
 }
 
 func (s *SchemaMap) serveSchema(w http.ResponseWriter, r *http.Request, id string) {
-	s.mu.RLock()
-	_, ok := s.Schema[id]
-	s.mu.RUnlock()
 	w.Header().Add("Content-Type", "application/json")
-	if ok {
+	if s.hasID(id) {
 		http.ServeFile(w, r, filepath.Join(s.Dir, id))
 	} else {
 		http.Error(w, "", http.StatusNotFound)
