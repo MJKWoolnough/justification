@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -41,7 +40,7 @@ func NewSchema(dir string) (*SchemaMap, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error reading schema file (%s): %w", schemapath, err)
 		}
-		url := "schema://" + path.Join("/", dir, name)
+		url := "schema:///" + name
 		if err := c.AddResource(url, f); err != nil {
 			return nil, fmt.Errorf("error adding scheme as resource: %w", err)
 		}
@@ -141,7 +140,7 @@ func (s *SchemaMap) uploadSchema(w http.ResponseWriter, r *http.Request, id stri
 	var b bytes.Buffer
 	io.Copy(&b, r.Body)
 	data := b.Bytes()
-	url := "schema://" + path.Join("/", s.Dir, id)
+	url := "schema:///" + id
 	if err := s.Compiler.AddResource(url, &b); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprintf(w, `{
