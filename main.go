@@ -22,7 +22,8 @@ func main() {
 
 func run() error {
 	schema := SchemaMap{
-		Schema: make(map[string]*jsonschema.Schema),
+		Compiler: jsonschema.NewCompiler(),
+		Schema:   make(map[string]*jsonschema.Schema),
 	}
 
 	port := flag.Uint("p", 8080, "port for server to listen on")
@@ -40,8 +41,6 @@ func run() error {
 		return fmt.Errorf("error reading schema directory: %w", err)
 	}
 
-	c := jsonschema.NewCompiler()
-
 	for _, file := range schemaDir {
 		name := file.Name()
 		schemapath := filepath.Join(schema.Dir, name)
@@ -50,7 +49,7 @@ func run() error {
 			return fmt.Errorf("error reading schema file (%s): %w", schemapath, err)
 		}
 		url := "schema://" + path.Join("/", schema.Dir, name)
-		c.AddResource(url, f)
+		schema.Compiler.AddResource(url, f)
 		s, err := c.Compile(url)
 		if err != nil {
 			return fmt.Errorf("error compiling schema: %w", err)

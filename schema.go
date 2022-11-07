@@ -12,7 +12,8 @@ import (
 )
 
 type SchemaMap struct {
-	Dir string
+	Compiler *jsonschema.Compiler
+	Dir      string
 
 	mu     sync.RWMutex
 	Schema map[string]*jsonschema.Schema
