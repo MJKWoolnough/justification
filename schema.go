@@ -14,6 +14,11 @@ import (
 	jsonschema "github.com/santhosh-tekuri/jsonschema/v5"
 )
 
+const (
+	optionsPost    = "OPTIONS, POST"
+	optionsGetHead = "OPTIONS, GET, HEAD"
+)
+
 type SchemaMap struct {
 	Compiler *jsonschema.Compiler
 	Dir      string
@@ -76,6 +81,7 @@ func (s *SchemaMap) handleSchema(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPost:
 		s.uploadSchema(w, r, id)
 	case http.MethodOptions:
+		s.handleSchemaOptions(w, r, id)
 	default:
 		http.Error(w, "", http.StatusMethodNotAllowed)
 	}
@@ -87,7 +93,32 @@ func (s *SchemaMap) handleValidate(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPost:
 		s.validateJSON(w, r, id)
 	case http.MethodOptions:
+		s.handleValidateOptions(w, r, id)
 	default:
+		http.Error(w, "", http.StatusMethodNotAllowed)
+	}
+}
+
+func (s *SchemaMap) handleSchemaOptions(w http.ResponseWriter, r *http.Request, id string) {
+	s.mu.RLock()
+	_, ok := s.Schema[id]
+	s.mu.RUnlock()
+	if ok {
+		w.Header().Add("Allow", optionsGetHead)
+	} else {
+		w.Header().Add("Allow", optionsPost)
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *SchemaMap) handleValidateOptions(w http.ResponseWriter, r *http.Request, id string) {
+	s.mu.RLock()
+	_, ok := s.Schema[id]
+	s.mu.RUnlock()
+	if ok {
+		w.Header().Add("Allow", optionsPost)
+		w.WriteHeader(http.StatusNoContent)
+	} else {
 		http.Error(w, "", http.StatusMethodNotAllowed)
 	}
 }
