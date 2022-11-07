@@ -10,9 +10,20 @@ import (
 	"os/signal"
 	"path"
 	"path/filepath"
+	"sync"
 
 	jsonschema "github.com/santhosh-tekuri/jsonschema/v5"
 )
+
+type SchemaMap struct {
+	Dir string
+
+	mu     sync.RWMutex
+	Schema map[string]*jsonschema.Schema
+}
+
+func (s *SchemaMap) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+}
 
 func main() {
 	if err := run(); err != nil {
@@ -21,39 +32,46 @@ func main() {
 }
 
 func run() error {
+	schema := SchemaMap{
+		Schema: make(map[string]*jsonschema.Schema),
+	}
+
 	port := flag.Uint("p", 8080, "port for server to listen on")
-	store := flag.String("d", "./schemas", "directory to store uploaded JSON schemas")
+	host := flag.String("h", "localhost", "server host name.")
+	_ = host
+	flag.StringVar(&schema.Dir, "d", "./schemas", "directory to store uplgoaded JSON schemas")
 	flag.Parse()
 
-	if err := os.Mkdir(*store, 0o755); err != nil && !os.IsExist(err) {
+	if err := os.Mkdir(schema.Dir, 0o755); err != nil && !os.IsExist(err) {
 		return fmt.Errorf("error creating schema directory: %w", err)
 	}
 
-	schemaDir, err := os.ReadDir(*store)
+	schemaDir, err := os.ReadDir(schema.Dir)
 	if err != nil {
 		return fmt.Errorf("error reading schema directory: %w", err)
 	}
 
 	c := jsonschema.NewCompiler()
-	schemas := make(map[string]*jsonschema.Schema)
-	for _, schema := range schemaDir {
-		schemapath := filepath.Join(*store, schema.Name())
+
+	for _, file := range schemaDir {
+		name := file.Name()
+		schemapath := filepath.Join(schema.Dir, name)
 		f, err := os.Open(schemapath)
 		if err != nil {
 			return fmt.Errorf("error reading schema file (%s): %w", schemapath, err)
 		}
-		url := "schema://" + path.Join("/", *store, schema.Name())
+		url := "schema://" + path.Join("/", schema.Dir, name)
 		c.AddResource(url, f)
 		s, err := c.Compile(url)
 		if err != nil {
 			return fmt.Errorf("error compiling schema: %w", err)
 		}
 		f.Close()
-		schemas[schema.Name()] = s
+		schema.Schema[name] = s
 	}
 
 	server := &http.Server{
-		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}),
+		Handler: &schema,
 	}
 
 	l, err := net.ListenTCP("tcp", &net.TCPAddr{Port: int(*port)})
