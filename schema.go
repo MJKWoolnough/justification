@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -86,4 +88,39 @@ func (s *SchemaMap) uploadSchema(w http.ResponseWriter, r *http.Request, id stri
 }
 
 func (s *SchemaMap) validateJSON(w http.ResponseWriter, r *http.Request, id string) {
+	s.mu.RLock()
+	schema, ok := s.Schema[id]
+	s.mu.RUnlock()
+	if ok {
+		w.Header().Add("Content-Type", "application/json")
+		dec := json.NewDecoder(r.Body)
+		dec.UseNumber()
+		var v interface{}
+		if err := dec.Decode(&v); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, `{
+	"action": "validateDocument",
+	"id": %q,
+	"status": "error",
+	"message": "Invalid JSON"
+}`, id)
+		}
+		// remove nulls
+		if err := schema.Validate(v); err != nil {
+			fmt.Fprintf(w, `{
+	"action": "validateDocument",
+	"id": %q,
+	"status": "error",
+	"message": %q
+}`, id, err)
+		} else {
+			fmt.Fprintf(w, `{
+	"action": "validateDocument",
+	"id": %q,
+	"status": "success"
+}`, id)
+		}
+	} else {
+		http.Error(w, "", http.StatusNotFound)
+	}
 }
