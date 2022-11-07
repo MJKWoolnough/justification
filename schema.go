@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"path"
 	"path/filepath"
 	"strings"
@@ -105,7 +106,8 @@ func (s *SchemaMap) uploadSchema(w http.ResponseWriter, r *http.Request, id stri
 	}
 	var b bytes.Buffer
 	io.Copy(&b, r.Body)
-	if !json.Valid(b.Bytes()) {
+	data := b.Bytes()
+	if !json.Valid(data) {
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprintf(w, `{
 	"action": "uploadSchema",
@@ -137,11 +139,26 @@ func (s *SchemaMap) uploadSchema(w http.ResponseWriter, r *http.Request, id stri
 }`, id, err)
 		return
 	}
-	s.Schema[id] = cs
-	fmt.Fprintf(w, `{
+	f, err := os.Create(filepath.Join(s.Dir, id))
+	if err == nil {
+		if _, err = f.Write(data); err == nil {
+			if err = f.Close(); err == nil {
+				s.Schema[id] = cs
+				fmt.Fprintf(w, `{
 	"action": "uploadSchema",
 	"id": %q,
 	"status": "success"
+}`, id)
+				return
+			}
+		}
+	}
+	w.WriteHeader(http.StatusInternalServerError)
+	fmt.Fprintf(w, `{
+	"action": "uploadSchema",
+	"id": %q,
+	"status": "error",
+	"message": "Unexpected Error"
 }`, id)
 }
 
