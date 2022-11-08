@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -110,23 +111,43 @@ func TestUpload(t *testing.T) {
 	}
 }
 
-func TestLoad(t *testing.T) {
-	tests := [...]struct {
-		ID, JSON string
-	}{
-		{
-			ID:   "SimpleBoolean",
-			JSON: "true",
-		},
-		{
-			ID:   "SimpleObject",
-			JSON: "{}",
-		},
-		{
-			ID:   "Complex",
-			JSON: `{"$schema": "http://json-schema.org/draft-04/schema#", "type": "object", "properties": {"source": {"type": "string"}, "destination": {"type": "string"}, "timeout": {"type": "integer", "minimum": 0, "maximum": 32767}, "chunks": {"type": "object", "properties": {"size": {"type": "integer"}, "number": {"type": "integer"}}, "required": ["size"]}}, "required": ["source", "destination"]}`,
-		},
+type IDSchema struct {
+	ID, JSON string
+}
+
+var schemaTestJSON = []IDSchema{
+	{
+		ID:   "SimpleBoolean",
+		JSON: "true",
+	},
+	{
+		ID:   "SimpleObject",
+		JSON: "{}",
+	},
+	{
+		ID:   "Complex",
+		JSON: `{"$schema": "http://json-schema.org/draft-04/schema#", "type": "object", "properties": {"source": {"type": "string"}, "destination": {"type": "string"}, "timeout": {"type": "integer", "minimum": 0, "maximum": 32767}, "chunks": {"type": "object", "properties": {"size": {"type": "integer"}, "number": {"type": "integer"}}, "required": ["size"]}}, "required": ["source", "destination"]}`,
+	},
+}
+
+func insertSchemas(url string, schemas []IDSchema) error {
+	for n, test := range schemas {
+		resp, err := http.Post(url+"/schema/"+test.ID, "application/json", strings.NewReader(test.JSON))
+		var r response
+		if err != nil {
+			return fmt.Errorf("test %d: unexpected error: %w", n+1, err)
+		} else if resp.StatusCode != http.StatusCreated {
+			return fmt.Errorf("test %d: unexpected error, expecting status code 201, got %d", n+1, resp.StatusCode)
+		} else if err := json.NewDecoder(resp.Body).Decode(&r); err != nil {
+			return fmt.Errorf("test %d: unexpected error: %w", n+1, err)
+		} else if r.Status != "success" {
+			return fmt.Errorf("test %d: unexpected error, expecting Message \"success\", got %q", n+1, r.Status)
+		}
 	}
+	return nil
+}
+
+func TestLoad(t *testing.T) {
 	dir, err := os.MkdirTemp("", "justification")
 	if err != nil {
 		t.Errorf("unexepected error creating Schema: %s", err)
@@ -140,22 +161,9 @@ func TestLoad(t *testing.T) {
 	}
 	server := httptest.NewServer(s)
 	defer server.Close()
-	for n, test := range tests {
-		resp, err := http.Post(server.URL+"/schema/"+test.ID, "application/json", strings.NewReader(test.JSON))
-		var r response
-		if err != nil {
-			t.Errorf("test %d: unexpected error: %s", n+1, err)
-			return
-		} else if resp.StatusCode != http.StatusCreated {
-			t.Errorf("test %d: unexpected error, expecting status code 201, got %d", n+1, resp.StatusCode)
-			return
-		} else if err := json.NewDecoder(resp.Body).Decode(&r); err != nil {
-			t.Errorf("test %d: unexpected error: %s", n+1, err)
-			return
-		} else if r.Status != "success" {
-			t.Errorf("test %d: unexpected error, expecting Message \"success\", got %q", n+1, r.Status)
-			return
-		}
+	if err = insertSchemas(server.URL, schemaTestJSON); err != nil {
+		t.Error(err)
+		return
 	}
 	s, err = NewSchema(dir)
 	if err != nil {
@@ -164,7 +172,7 @@ func TestLoad(t *testing.T) {
 	}
 	server = httptest.NewServer(s)
 	defer server.Close()
-	for n, test := range tests {
+	for n, test := range schemaTestJSON {
 		resp, err := http.Get(server.URL + "/schema/" + test.ID)
 		var b bytes.Buffer
 		if err != nil {
