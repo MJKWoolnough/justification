@@ -106,10 +106,17 @@ func (s *Schema) handleSchema(w http.ResponseWriter, r *http.Request) {
 		s.serveSchema(w, r, id)
 	case http.MethodPost:
 		s.uploadSchema(w, r, id)
-	case http.MethodOptions:
-		s.handleSchemaOptions(w, r, id)
 	default:
-		respond(w, http.StatusMethodNotAllowed, `{"action": "uploadSchema", "id": %q, "status": "error", "message": "Method Not Allowed"}`, id)
+		if s.hasID(id) {
+			w.Header().Add("Allow", optionsGetHead)
+		} else {
+			w.Header().Add("Allow", optionsPost)
+		}
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+		} else {
+			respond(w, http.StatusMethodNotAllowed, `{"action": "uploadSchema", "id": %q, "status": "error", "message": "Method Not Allowed"}`, id)
+		}
 	}
 }
 
@@ -119,31 +126,19 @@ func (s *Schema) handleValidate(w http.ResponseWriter, r *http.Request) {
 		respond(w, http.StatusBadRequest, `{"action": "validateDocument", "id": %q, "status": "error", "message": "Invalid ID"}`, id)
 		return
 	}
-	switch r.Method {
-	case http.MethodPost:
-		s.validateJSON(w, r, id)
-	case http.MethodOptions:
-		s.handleValidateOptions(w, r, id)
-	default:
-		respond(w, http.StatusMethodNotAllowed, `{"action": "validateDocument", "id": %q, "status": "error", "message": "Method Not Allowed"}`, id)
-	}
-}
-
-func (s *Schema) handleSchemaOptions(w http.ResponseWriter, r *http.Request, id string) {
 	if s.hasID(id) {
-		w.Header().Add("Allow", optionsGetHead)
+		switch r.Method {
+		case http.MethodPost:
+			s.validateJSON(w, r, id)
+		case http.MethodOptions:
+			w.Header().Add("Allow", optionsPost)
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			w.Header().Add("Allow", optionsPost)
+			respond(w, http.StatusMethodNotAllowed, `{"action": "validateDocument", "id": %q, "status": "error", "message": "Method Not Allowed"}`, id)
+		}
 	} else {
-		w.Header().Add("Allow", optionsPost)
-	}
-	w.WriteHeader(http.StatusNoContent)
-}
-
-func (s *Schema) handleValidateOptions(w http.ResponseWriter, r *http.Request, id string) {
-	if s.hasID(id) {
-		w.Header().Add("Allow", optionsPost)
-		w.WriteHeader(http.StatusNoContent)
-	} else {
-		respond(w, http.StatusMethodNotAllowed, `{"action": "validateDocument", "id": %q, "status": "error", "message": "Method Not Allowed"}`, id)
+		respond(w, http.StatusNotFound, `{"action": "validateDocument", "id": %q, "status": "error", "message": "Unknown ID"}`, id)
 	}
 }
 
@@ -152,7 +147,7 @@ func (s *Schema) serveSchema(w http.ResponseWriter, r *http.Request, id string) 
 		w.Header().Set("Content-Type", "application/json")
 		http.ServeFile(w, r, filepath.Join(s.Dir, id))
 	} else {
-		respond(w, http.StatusNotFound, `{"action": "uploadSchema", "id": %q, "status": "error", "message": "Unknown ID"}`, id)
+		respond(w, http.StatusMethodNotAllowed, `{"action": "uploadSchema", "id": %q, "status": "error", "message": "Method Not Allowed"}`, id)
 	}
 }
 
@@ -160,7 +155,8 @@ func (s *Schema) uploadSchema(w http.ResponseWriter, r *http.Request, id string)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if _, ok := s.Schema[id]; ok {
-		respond(w, http.StatusMethodNotAllowed, `{"action": "uploadSchema", "id": %q, "status": "error", "message": "ID Exists"}`, id)
+		w.Header().Add("Allow", optionsGetHead)
+		respond(w, http.StatusMethodNotAllowed, `{"action": "uploadSchema", "id": %q, "status": "error", "message": "Method Not Allowed"}`, id)
 		return
 	}
 	var b bytes.Buffer
@@ -192,24 +188,20 @@ func (s *Schema) uploadSchema(w http.ResponseWriter, r *http.Request, id string)
 
 func (s *Schema) validateJSON(w http.ResponseWriter, r *http.Request, id string) {
 	s.mu.RLock()
-	schema, ok := s.Schema[id]
+	schema := s.Schema[id]
 	s.mu.RUnlock()
-	if ok {
-		dec := json.NewDecoder(r.Body)
-		dec.UseNumber()
-		var v interface{}
-		if err := dec.Decode(&v); err != nil {
-			respond(w, http.StatusBadRequest, `{"action": "validateDocument", "id": %q, "status": "error", "message": "Invalid JSON"}`, id)
-			return
-		}
-		removeNulls(v)
-		if err := schema.Validate(v); err != nil {
-			respond(w, http.StatusOK, `{"action": "validateDocument", "id": %q, "status": "error", "message": %q}`, id, err)
-		} else {
-			respond(w, http.StatusOK, `{"action": "validateDocument", "id": %q, "status": "success"}`, id)
-		}
+	dec := json.NewDecoder(r.Body)
+	dec.UseNumber()
+	var v interface{}
+	if err := dec.Decode(&v); err != nil {
+		respond(w, http.StatusBadRequest, `{"action": "validateDocument", "id": %q, "status": "error", "message": "Invalid JSON"}`, id)
+		return
+	}
+	removeNulls(v)
+	if err := schema.Validate(v); err != nil {
+		respond(w, http.StatusOK, `{"action": "validateDocument", "id": %q, "status": "error", "message": %q}`, id, err)
 	} else {
-		respond(w, http.StatusNotFound, `{"action": "validateDocument", "id": %q, "status": "error", "message": "Unknown ID"}`, id)
+		respond(w, http.StatusOK, `{"action": "validateDocument", "id": %q, "status": "success"}`, id)
 	}
 }
 

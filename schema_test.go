@@ -52,7 +52,7 @@ func TestUpload(t *testing.T) {
 			JSON:    `{}`,
 			Code:    http.StatusMethodNotAllowed,
 			Status:  "error",
-			Message: "ID Exists",
+			Message: "Method Not Allowed",
 		},
 		{
 			ID:      "ANOTHER_TEST",
@@ -103,8 +103,8 @@ func TestUpload(t *testing.T) {
 				expectingCode = http.StatusOK
 				expectingJSON = test.JSON
 			} else {
-				expectingCode = http.StatusNotFound
-				expectingJSON = fmt.Sprintf(`{"action": "uploadSchema", "id": %q, "status": "error", "message": "Unknown ID"}`, test.ID)
+				expectingCode = http.StatusMethodNotAllowed
+				expectingJSON = fmt.Sprintf(`{"action": "uploadSchema", "id": %q, "status": "error", "message": "Method Not Allowed"}`, test.ID)
 			}
 			var b bytes.Buffer
 			if err != nil {
@@ -340,7 +340,7 @@ func TestOptions(t *testing.T) {
 		{
 			Endpoint: "/validate/Unknown",
 			Options:  "",
-			Code:     http.StatusMethodNotAllowed,
+			Code:     http.StatusNotFound,
 		},
 		{
 			Endpoint: "/validate/Complex",
