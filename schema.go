@@ -201,6 +201,7 @@ func (s *Schema) validateJSON(w http.ResponseWriter, r *http.Request, id string)
 		var v interface{}
 		if err := dec.Decode(&v); err != nil {
 			respond(w, http.StatusBadRequest, `{"action": "validateDocument", "id": %q, "status": "error", "message": "Invalid JSON"}`, id)
+			return
 		}
 		removeNulls(v)
 		if err := schema.Validate(v); err != nil {
