@@ -93,19 +93,30 @@ func TestUpload(t *testing.T) {
 			t.Errorf("test %d.1: expecting Status %q, got %q", n+1, test.Status, r.Status)
 		} else if r.Message != test.Message {
 			t.Errorf("test %d.1: expecting Message %q, got %q", n+1, test.Message, r.Message)
-		} else if test.Code == http.StatusCreated {
+		} else if test.Message != "Invalid ID" {
 			resp, err := http.Get(server.URL + "/schema/" + test.ID)
+			var (
+				expectingCode int
+				expectingJSON string
+			)
+			if test.Code == http.StatusCreated || test.Code == http.StatusMethodNotAllowed {
+				expectingCode = http.StatusOK
+				expectingJSON = test.JSON
+			} else {
+				expectingCode = http.StatusNotFound
+				expectingJSON = fmt.Sprintf(`{"action": "uploadSchema", "id": %q, "status": "error", "message": "Unknown ID"}`, test.ID)
+			}
 			var b bytes.Buffer
 			if err != nil {
 				t.Errorf("test %d.2: unexpected error grabbing Scheme JSON: %s", n+1, err)
 			} else if ct := resp.Header.Get("Content-Type"); ct != "application/json" {
 				t.Errorf("test %d.2: expecting Content-Type of \"application/json\", %s", n+1, ct)
-			} else if resp.StatusCode != http.StatusOK {
-				t.Errorf("test %d.2: expecting status code 200, got %d", n+1, resp.StatusCode)
+			} else if resp.StatusCode != expectingCode {
+				t.Errorf("test %d.2: expecting status code %d, got %d", n+1, expectingCode, resp.StatusCode)
 			} else if _, err := io.Copy(&b, resp.Body); err != nil {
 				t.Errorf("test %d.2: unexpected error reading Scheme JSON: %s", n+1, err)
-			} else if str := b.String(); str != test.JSON {
-				t.Errorf("test %d.2: expecting to read JSON %q, got %q", n+1, test.JSON, str)
+			} else if str := b.String(); str != expectingJSON {
+				t.Errorf("test %d.2: expecting to read JSON %q, got %q", n+1, expectingJSON, str)
 			}
 		}
 	}
