@@ -44,10 +44,9 @@ type Schema struct {
 }
 
 func NewSchema(dir string) (*Schema, error) {
-	if err := os.Mkdir(dir, 0o755); err != nil && !os.IsExist(err) {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, fmt.Errorf("error creating schema directory: %w", err)
 	}
-
 	schemaDir, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, fmt.Errorf("error reading schema directory: %w", err)
