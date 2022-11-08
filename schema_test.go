@@ -82,7 +82,7 @@ func TestUpload(t *testing.T) {
 		} else if resp.StatusCode != test.Code {
 			t.Errorf("test %d.1: expecting status code %d, got %d", n+1, test.Code, resp.StatusCode)
 		} else if ct := resp.Header.Get("Content-Type"); ct != "application/json" {
-			t.Errorf("test %d.1: expecting Content-Type of \"application/json\", %s", n+1, ct)
+			t.Errorf("test %d.1: expecting Content-Type of \"application/json\", got %s", n+1, ct)
 		} else if err := json.NewDecoder(resp.Body).Decode(&r); err != nil {
 			t.Errorf("test %d.1: unexpected error: %s", n+1, err)
 		} else if r.Action != "uploadSchema" {
@@ -96,21 +96,24 @@ func TestUpload(t *testing.T) {
 		} else if test.Message != "Invalid ID" {
 			resp, err := http.Get(server.URL + "/schema/" + test.ID)
 			var (
-				expectingCode int
-				expectingJSON string
+				expectingCode        int
+				expectingJSON        string
+				expectingContentType string
 			)
 			if test.Code == http.StatusCreated || test.Code == http.StatusMethodNotAllowed {
 				expectingCode = http.StatusOK
 				expectingJSON = test.JSON
+				expectingContentType = "application/schema+json"
 			} else {
 				expectingCode = http.StatusMethodNotAllowed
 				expectingJSON = fmt.Sprintf(`{"action": "uploadSchema", "id": %q, "status": "error", "message": "Method Not Allowed"}`, test.ID)
+				expectingContentType = "application/json"
 			}
 			var b bytes.Buffer
 			if err != nil {
 				t.Errorf("test %d.2: unexpected error grabbing Scheme JSON: %s", n+1, err)
-			} else if ct := resp.Header.Get("Content-Type"); ct != "application/json" {
-				t.Errorf("test %d.2: expecting Content-Type of \"application/json\", %s", n+1, ct)
+			} else if ct := resp.Header.Get("Content-Type"); ct != expectingContentType {
+				t.Errorf("test %d.2: expecting Content-Type of %s, got %s", n+1, expectingContentType, ct)
 			} else if resp.StatusCode != expectingCode {
 				t.Errorf("test %d.2: expecting status code %d, got %d", n+1, expectingCode, resp.StatusCode)
 			} else if _, err := io.Copy(&b, resp.Body); err != nil {
@@ -188,8 +191,8 @@ func TestLoad(t *testing.T) {
 		var b bytes.Buffer
 		if err != nil {
 			t.Errorf("test %d: unexpected error grabbing Scheme JSON: %s", n+1, err)
-		} else if ct := resp.Header.Get("Content-Type"); ct != "application/json" {
-			t.Errorf("test %d: expecting Content-Type of \"application/json\", %s", n+1, ct)
+		} else if ct := resp.Header.Get("Content-Type"); ct != "application/schema+json" {
+			t.Errorf("test %d: expecting Content-Type of \"application/schema+json\", got %s", n+1, ct)
 		} else if resp.StatusCode != http.StatusOK {
 			t.Errorf("test %d: expecting status code 200, got %d", n+1, resp.StatusCode)
 		} else if _, err := io.Copy(&b, resp.Body); err != nil {

@@ -144,7 +144,7 @@ func (s *Schema) handleValidate(w http.ResponseWriter, r *http.Request) {
 
 func (s *Schema) serveSchema(w http.ResponseWriter, r *http.Request, id string) {
 	if s.hasID(id) {
-		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Content-Type", "application/schema+json")
 		http.ServeFile(w, r, filepath.Join(s.Dir, id))
 	} else {
 		respond(w, http.StatusMethodNotAllowed, `{"action": "uploadSchema", "id": %q, "status": "error", "message": "Method Not Allowed"}`, id)
