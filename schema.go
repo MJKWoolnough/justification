@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -187,6 +188,7 @@ func (s *Schema) uploadSchema(w http.ResponseWriter, r *http.Request, id string)
 		}
 	}
 	respond(w, http.StatusInternalServerError, `{"action": "uploadSchema", "id": %q, "status": "error", "message": "Unexpected Error"}`, id)
+	log.Printf("error saving schema: %s", err)
 }
 
 func (s *Schema) validateJSON(w http.ResponseWriter, r *http.Request, id string) {
