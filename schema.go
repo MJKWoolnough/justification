@@ -205,7 +205,7 @@ func (s *Schema) validateJSON(w http.ResponseWriter, r *http.Request, id string)
 		}
 		removeNulls(v)
 		if err := schema.Validate(v); err != nil {
-			respond(w, http.StatusBadRequest, `{"action": "validateDocument", "id": %q, "status": "error", "message": %q}`, id, err)
+			respond(w, http.StatusOK, `{"action": "validateDocument", "id": %q, "status": "error", "message": %q}`, id, err)
 		} else {
 			respond(w, http.StatusOK, `{"action": "validateDocument", "id": %q, "status": "success"}`, id)
 		}
