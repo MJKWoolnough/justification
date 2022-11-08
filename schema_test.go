@@ -109,3 +109,74 @@ func TestUpload(t *testing.T) {
 		}
 	}
 }
+
+func TestLoad(t *testing.T) {
+	tests := [...]struct {
+		ID, JSON string
+	}{
+		{
+			ID:   "SimpleBoolean",
+			JSON: "true",
+		},
+		{
+			ID:   "SimpleObject",
+			JSON: "{}",
+		},
+		{
+			ID:   "Complex",
+			JSON: `{"$schema": "http://json-schema.org/draft-04/schema#", "type": "object", "properties": {"source": {"type": "string"}, "destination": {"type": "string"}, "timeout": {"type": "integer", "minimum": 0, "maximum": 32767}, "chunks": {"type": "object", "properties": {"size": {"type": "integer"}, "number": {"type": "integer"}}, "required": ["size"]}}, "required": ["source", "destination"]}`,
+		},
+	}
+	dir, err := os.MkdirTemp("", "justification")
+	if err != nil {
+		t.Errorf("unexepected error creating Schema: %s", err)
+		return
+	}
+	defer os.RemoveAll(dir)
+	s, err := NewSchema(dir)
+	if err != nil {
+		t.Errorf("unexepected error creating Schema: %s", err)
+		return
+	}
+	server := httptest.NewServer(s)
+	defer server.Close()
+	for n, test := range tests {
+		resp, err := http.Post(server.URL+"/schema/"+test.ID, "application/json", strings.NewReader(test.JSON))
+		var r response
+		if err != nil {
+			t.Errorf("test %d: unexpected error: %s", n+1, err)
+			return
+		} else if resp.StatusCode != http.StatusCreated {
+			t.Errorf("test %d: unexpected error, expecting status code 201, got %d", n+1, resp.StatusCode)
+			return
+		} else if err := json.NewDecoder(resp.Body).Decode(&r); err != nil {
+			t.Errorf("test %d: unexpected error: %s", n+1, err)
+			return
+		} else if r.Status != "success" {
+			t.Errorf("test %d: unexpected error, expecting Message \"success\", got %q", n+1, r.Status)
+			return
+		}
+	}
+	s, err = NewSchema(dir)
+	if err != nil {
+		t.Errorf("unexepected error loading Schema: %s", err)
+		return
+	}
+	server = httptest.NewServer(s)
+	defer server.Close()
+	for n, test := range tests {
+		resp, err := http.Get(server.URL + "/schema/" + test.ID)
+		var b bytes.Buffer
+		if err != nil {
+			t.Errorf("test %d: unexpected error grabbing Scheme JSON: %s", n+1, err)
+		} else if ct := resp.Header.Get("Content-Type"); ct != "application/json" {
+			t.Errorf("test %d: expecting Content-Type of \"application/json\", %s", n+1, ct)
+		} else if resp.StatusCode != http.StatusOK {
+			t.Errorf("test %d: expecting status code 200, got %d", n+1, resp.StatusCode)
+		} else if _, err := io.Copy(&b, resp.Body); err != nil {
+			t.Errorf("test %d: unexpected error reading Scheme JSON: %s", n+1, err)
+		} else if str := b.String(); str != test.JSON {
+			t.Errorf("test %d: expecting to read JSON %q, got %q", n+1, test.JSON, str)
+		}
+	}
+}
