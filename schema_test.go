@@ -324,36 +324,71 @@ func TestOptions(t *testing.T) {
 	}
 	var c http.Client
 	for n, test := range [...]struct {
-		Endpoint, Options string
-		Code              int
+		Method, Endpoint, Options string
+		Code                      int
 	}{
 		{
+			Method:   http.MethodOptions,
 			Endpoint: "/schema/Unknown",
 			Options:  optionsPost,
 			Code:     http.StatusNoContent,
 		},
 		{
+			Method:   http.MethodOptions,
 			Endpoint: "/schema/Complex",
 			Options:  optionsGetHead,
 			Code:     http.StatusNoContent,
 		},
 		{
+			Method:   http.MethodOptions,
 			Endpoint: "/validate/Unknown",
 			Options:  "",
 			Code:     http.StatusNotFound,
 		},
 		{
+			Method:   http.MethodOptions,
 			Endpoint: "/validate/Complex",
 			Options:  optionsPost,
 			Code:     http.StatusNoContent,
 		},
 		{
+			Method:   http.MethodOptions,
+			Endpoint: "/other-endpoint",
+			Options:  "",
+			Code:     http.StatusNotFound,
+		},
+		{
+			Method:   http.MethodPut,
+			Endpoint: "/schema/Unknown",
+			Options:  optionsPost,
+			Code:     http.StatusMethodNotAllowed,
+		},
+		{
+			Method:   http.MethodPut,
+			Endpoint: "/schema/Complex",
+			Options:  optionsGetHead,
+			Code:     http.StatusMethodNotAllowed,
+		},
+		{
+			Method:   http.MethodPut,
+			Endpoint: "/validate/Unknown",
+			Options:  "",
+			Code:     http.StatusNotFound,
+		},
+		{
+			Method:   http.MethodPut,
+			Endpoint: "/validate/Complex",
+			Options:  optionsPost,
+			Code:     http.StatusMethodNotAllowed,
+		},
+		{
+			Method:   http.MethodPut,
 			Endpoint: "/other-endpoint",
 			Options:  "",
 			Code:     http.StatusNotFound,
 		},
 	} {
-		req, _ := http.NewRequest("OPTIONS", server.URL+test.Endpoint, nil)
+		req, _ := http.NewRequest(test.Method, server.URL+test.Endpoint, nil)
 		resp, err := c.Do(req)
 		if err != nil {
 			t.Errorf("test %d: unexpected error: %s", n+1, err)
