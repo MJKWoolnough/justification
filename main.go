@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 )
 
 func main() {
@@ -18,8 +19,12 @@ func main() {
 }
 
 func run() error {
+	defaultDir, err := os.UserConfigDir()
+	if err != nil {
+		return fmt.Errorf("error getting user config dir: %w", err)
+	}
 	port := flag.Uint("p", 8080, "port for server to listen on")
-	dir := flag.String("d", "./schemas", "directory to store uplgoaded JSON schemas")
+	dir := flag.String("d", filepath.Join(defaultDir, "justification"), "directory to store uploaded JSON schemas")
 	flag.Parse()
 
 	schema, err := NewSchema(*dir)
