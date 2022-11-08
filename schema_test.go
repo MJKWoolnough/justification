@@ -303,3 +303,64 @@ func TestValidate(t *testing.T) {
 		}
 	}
 }
+
+func TestOptions(t *testing.T) {
+	dir, err := os.MkdirTemp("", "justification")
+	if err != nil {
+		t.Errorf("unexepected error creating Schema: %s", err)
+		return
+	}
+	defer os.RemoveAll(dir)
+	s, err := NewSchema(dir)
+	if err != nil {
+		t.Errorf("unexepected error creating Schema: %s", err)
+		return
+	}
+	server := httptest.NewServer(s)
+	defer server.Close()
+	if err = insertSchemas(server.URL, schemaTestJSON); err != nil {
+		t.Error(err)
+		return
+	}
+	var c http.Client
+	for n, test := range [...]struct {
+		Endpoint, Options string
+		Code              int
+	}{
+		{
+			Endpoint: "/schema/Unknown",
+			Options:  optionsPost,
+			Code:     http.StatusNoContent,
+		},
+		{
+			Endpoint: "/schema/Complex",
+			Options:  optionsGetHead,
+			Code:     http.StatusNoContent,
+		},
+		{
+			Endpoint: "/validate/Unknown",
+			Options:  "",
+			Code:     http.StatusMethodNotAllowed,
+		},
+		{
+			Endpoint: "/validate/Complex",
+			Options:  optionsPost,
+			Code:     http.StatusNoContent,
+		},
+		{
+			Endpoint: "/other-endpoint",
+			Options:  "",
+			Code:     http.StatusNotFound,
+		},
+	} {
+		req, _ := http.NewRequest("OPTIONS", server.URL+test.Endpoint, nil)
+		resp, err := c.Do(req)
+		if err != nil {
+			t.Errorf("test %d: unexpected error: %s", n+1, err)
+		} else if resp.StatusCode != test.Code {
+			t.Errorf("test %d: expecting status code %d, got %d", n+1, test.Code, resp.StatusCode)
+		} else if options := resp.Header.Get("Allow"); options != test.Options {
+			t.Errorf("test %d: expecting options %q, got %q", n+1, test.Options, options)
+		}
+	}
+}
