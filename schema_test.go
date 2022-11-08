@@ -188,3 +188,107 @@ func TestLoad(t *testing.T) {
 		}
 	}
 }
+
+func TestValidate(t *testing.T) {
+	dir, err := os.MkdirTemp("", "justification")
+	if err != nil {
+		t.Errorf("unexepected error creating Schema: %s", err)
+		return
+	}
+	defer os.RemoveAll(dir)
+	s, err := NewSchema(dir)
+	if err != nil {
+		t.Errorf("unexepected error creating Schema: %s", err)
+		return
+	}
+	server := httptest.NewServer(s)
+	defer server.Close()
+	if err = insertSchemas(server.URL, schemaTestJSON); err != nil {
+		t.Error(err)
+		return
+	}
+	for n, test := range [...]struct {
+		ID, JSON, Status, Message string
+		Code                      int
+	}{
+		{
+			ID:     "SimpleBoolean",
+			JSON:   "{}",
+			Status: "success",
+			Code:   http.StatusOK,
+		},
+		{
+			ID:      "Bad ID",
+			JSON:    "{}",
+			Status:  "error",
+			Message: "Invalid ID",
+			Code:    http.StatusBadRequest,
+		},
+		{
+			ID:      "Unknown",
+			JSON:    "{}",
+			Status:  "error",
+			Message: "Unknown ID",
+			Code:    http.StatusNotFound,
+		},
+		{
+			ID:      "SimpleBoolean",
+			JSON:    "{",
+			Status:  "error",
+			Message: "Invalid JSON",
+			Code:    http.StatusBadRequest,
+		},
+		{
+			ID:     "SimpleObject",
+			JSON:   "{}",
+			Status: "success",
+			Code:   http.StatusOK,
+		},
+		{
+			ID:      "Complex",
+			JSON:    "{}",
+			Status:  "error",
+			Message: "jsonschema: '' does not validate with schema:///Complex#/required: missing properties: 'source', 'destination'",
+			Code:    http.StatusOK,
+		},
+		{
+			ID:     "Complex",
+			JSON:   `{"source": "/home/alice/image.iso", "destination": "/mnt/storage", "chunks": {"size": 1024}}`,
+			Status: "success",
+			Code:   http.StatusOK,
+		},
+		{
+			ID:     "Complex",
+			JSON:   `{"source": "/home/alice/image.iso", "destination": "/mnt/storage", "timeout": null, "chunks": {"size": 1024, "number": null}}`,
+			Status: "success",
+			Code:   http.StatusOK,
+		},
+		{
+			ID:      "Complex",
+			JSON:    `{"source": "/home/alice/image.iso", "destination": null}`,
+			Status:  "error",
+			Message: "jsonschema: '' does not validate with schema:///Complex#/required: missing properties: 'destination'",
+			Code:    http.StatusOK,
+		},
+	} {
+		resp, err := http.Post(server.URL+"/validate/"+test.ID, "application/json", strings.NewReader(test.JSON))
+		var r response
+		if err != nil {
+			t.Errorf("test %d: unexpected error: %s", n+1, err)
+		} else if resp.StatusCode != test.Code {
+			t.Errorf("test %d: expecting status code %d, got %d", n+1, test.Code, resp.StatusCode)
+		} else if ct := resp.Header.Get("Content-Type"); ct != "application/json" {
+			t.Errorf("test %d: expecting Content-Type of \"application/json\", %s", n+1, ct)
+		} else if err := json.NewDecoder(resp.Body).Decode(&r); err != nil {
+			t.Errorf("test %d: unexpected error: %s", n+1, err)
+		} else if r.Action != "validateDocument" {
+			t.Errorf("test %d: expecting Action \"validateDocument\", got %q", n+1, r.Action)
+		} else if r.ID != test.ID {
+			t.Errorf("test %d: expecting ID %q, got %q", n+1, test.ID, r.ID)
+		} else if r.Status != test.Status {
+			t.Errorf("test %d: expecting Status %q, got %q", n+1, test.Status, r.Status)
+		} else if r.Message != test.Message {
+			t.Errorf("test %d: expecting Message %q, got %q", n+1, test.Message, r.Message)
+		}
+	}
+}
