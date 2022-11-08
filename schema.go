@@ -103,7 +103,7 @@ func (s *Schema) handleSchema(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	switch r.Method {
-	case http.MethodGet:
+	case http.MethodGet, http.MethodHead:
 		s.serveSchema(w, r, id)
 	case http.MethodPost:
 		s.uploadSchema(w, r, id)
