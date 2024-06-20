@@ -23,8 +23,10 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("error getting user config dir: %w", err)
 	}
+
 	port := flag.Uint("p", 8080, "port for server to listen on")
 	dir := flag.String("d", filepath.Join(defaultDir, "justification"), "directory to store uploaded JSON schemas")
+
 	flag.Parse()
 
 	schema, err := NewSchema(*dir)
@@ -32,9 +34,7 @@ func run() error {
 		return err
 	}
 
-	server := &http.Server{
-		Handler: schema,
-	}
+	server := &http.Server{Handler: schema}
 
 	l, err := net.ListenTCP("tcp", &net.TCPAddr{Port: int(*port)})
 	if err != nil {
