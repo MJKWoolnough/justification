@@ -12,7 +12,7 @@ The REST server contains two endpoints as follows:
 | `GET  /schema/$SCHEMAID`   | Used to retrieve stores JSON schemas from the server. |
 | `POST /validate/$SCHEMAID` | Used to validate JSON against a store schema.<br>Null objects entries will be stripped out of the JSON before validation. |
 
-$SCHEMAID can be any combination of alphanumerical characters as well as underscore '\_' (ascii 95/0x5f) and hypen '-' (ascii 45/0x2d).
+$SCHEMAID can be any combination of alphanumerical characters as well as underscore '\_' (ASCII 95/0x5f) and hyphen '-' (ASCII 45/0x2d).
 
 ## Installation
 
