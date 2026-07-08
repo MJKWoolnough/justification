@@ -30,7 +30,7 @@ func validID(id string) bool {
 	return true
 }
 
-func respond(w http.ResponseWriter, code int, format string, a ...interface{}) {
+func respond(w http.ResponseWriter, code int, format string, a ...any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	fmt.Fprintf(w, format, a...)
@@ -225,7 +225,7 @@ func (s *Schema) validateJSON(w http.ResponseWriter, r *http.Request, id string)
 
 	dec.UseNumber()
 
-	var v interface{}
+	var v any
 
 	if err := dec.Decode(&v); err != nil {
 		respond(w, http.StatusBadRequest, `{"action": "validateDocument", "id": %q, "status": "error", "message": "Invalid JSON"}`, id)
@@ -242,8 +242,8 @@ func (s *Schema) validateJSON(w http.ResponseWriter, r *http.Request, id string)
 	}
 }
 
-func removeNulls(v interface{}) {
-	if obj, ok := v.(map[string]interface{}); ok {
+func removeNulls(v any) {
+	if obj, ok := v.(map[string]any); ok {
 		for key, value := range obj {
 			if value == nil {
 				delete(obj, key)
